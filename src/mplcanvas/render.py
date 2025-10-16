@@ -1,6 +1,5 @@
-from matplotlib.colors import to_hex
 import numpy as np
-
+from matplotlib.colors import to_hex
 
 from .utils import flip_y
 

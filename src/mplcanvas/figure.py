@@ -1,12 +1,9 @@
 # mplcanvas/figure.py
-from ipycanvas import hold_canvas, Canvas
 import ipywidgets as ipw
-
-
-from matplotlib.figure import Figure as MplFigure
-from matplotlib.axes import Axes
 import matplotlib
-
+from ipycanvas import Canvas, MultiCanvas, hold_canvas
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure as MplFigure
 
 matplotlib.use("Agg")  # Headless backend
 
@@ -27,6 +24,7 @@ class Figure(ipw.HBox):
         self,
         facecolor: str = "white",
         # toolbar: bool = True,
+        ncanvases: int = 1,
         **kwargs,
     ):
         self.mpl_figure = MplFigure(facecolor=facecolor, **kwargs)
@@ -39,16 +37,16 @@ class Figure(ipw.HBox):
 
         layout = ipw.Layout(width=f"{self.width}px", height=f"{self.height}px")
 
-        # # Create the canvas
-        # self.multicanvas = MultiCanvas(
-        #     2, width=self.width, height=self.height, layout=layout
-        # )
-        # # self.multicanvas[0].style = {"zIndex": 0}  # Background
+        # Create the canvas
+        self.multicanvas = MultiCanvas(
+            ncanvases + 1, width=self.width, height=self.height, layout=layout
+        )
+        # self.multicanvas[0].style = {"zIndex": 0}  # Background
 
-        # self.drawing_canvas = self.multicanvas[1]
+        self.drawing_canvas = self.multicanvas[-1]
         # self.canvas = self.multicanvas[0]
 
-        self.canvas = Canvas(width=self.width, height=self.height, layout=layout)
+        # self.canvas = Canvas(width=self.width, height=self.height, layout=layout)
 
         # Create toolbar if requested
         self.toolbar = Toolbar(figure=self)
@@ -62,22 +60,27 @@ class Figure(ipw.HBox):
 
         # Initialize as VBox with canvas as child
         super().__init__(
-            children=[self.toolbar, ipw.VBox([self.canvas, self.status_bar])],
+            children=[self.toolbar, ipw.VBox([self.multicanvas, self.status_bar])],
             # children=[ipw.VBox([self.canvas])],
             **kwargs,
         )
 
         # Container for all axes
-        # self.axes: List[Axes] = []
+        self._axes_to_canvas = {}
+        self._canvas_to_axes = {}
 
         # Figure-level properties
         self.facecolor = facecolor
 
-        # Auto-draw on creation
-        self._auto_draw = True
+        # # Auto-draw on creation
+        # self._auto_draw = True
 
     def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> Axes:
-        return self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
+        new_axes = self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
+        self._axes_to_canvas[id(new_axes)] = index
+        self._canvas_to_axes[index] = new_axes
+        return new_axes
+
         # """Add a subplot to the figure"""
         # from .axes import Axes  # Import here to avoid circular imports
 
@@ -170,20 +173,40 @@ class Figure(ipw.HBox):
         # Let the parent VBox handle the representation
         return super()._repr_mimebundle_(include=include, exclude=exclude)
 
-    def draw(self):
+    def _draw_canvas(self, canvas, index):
         """Render the entire figure"""
-        with hold_canvas(self.canvas):
+        with hold_canvas(canvas):
             # Clear canvas
-            self.canvas.clear()
+            canvas.clear()
 
             # Draw background
-            self.canvas.fill_style = self.facecolor
-            self.canvas.fill_rect(0, 0, self.width, self.height)
+            canvas.fill_style = self.facecolor
+            canvas.fill_rect(0, 0, self.width, self.height)
 
-            # Draw all axes
-            # print("Drawing all axes...", self.mpl_figure.axes)
-            for ax in self.mpl_figure.axes:
-                draw_axes(ax, self.canvas)
+            ax = self._canvas_to_axes[index]
+            draw_axes(ax, canvas)
+
+            # # Draw all axes
+            # # print("Drawing all axes...", self.mpl_figure.axes)
+            # for ax in self.mpl_figure.axes:
+            #     draw_axes(ax, canvas)
+
+    def draw(self, ax: Axes | None = None):
+        """
+        Render the figure or a specific axes.
+
+        If index is None, redraw the entire figure.
+        If index is an integer, redraw only the specified axes (1-based index).
+        """
+        index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
+        if index is None:
+            # Redraw all canvases
+            for i in range(len(self.multicanvas._canvases) - 1):
+                self._draw_canvas(self.multicanvas[i], index=i)
+        else:
+            # if index < 1 or index >= len(self.multicanvas.canvases):
+            #     raise ValueError(f"Invalid axes index {index}")
+            self._draw_canvas(self.multicanvas[index], index=index)
 
     def show(self):
         """
