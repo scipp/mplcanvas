@@ -186,14 +186,14 @@ class Toolbar(widgets.VBox):
         """Handle mouse press for active tools"""
         y = flip_y(y, self.figure.canvas)
         ax = self.figure._find_axes_at_position((x, y))
-        if ax is None:
+        if (ax is None) or (self._active_tool is None):
             return
 
         if self._active_tool == "pan":
             # self._active_axes = self._determine_active_axes(event)
             # if self._active_axes:
             self._start_pan(ax, x, y)
-        elif self._get_active_tool() == "zoom":
+        elif self._active_tool == "zoom":
             # self._active_axes = self._determine_active_axes(event)
             self._start_zoom(ax, x, y)
 

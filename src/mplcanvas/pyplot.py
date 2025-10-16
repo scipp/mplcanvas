@@ -41,14 +41,14 @@ def subplots(nrows=1, ncols=1, **kwargs):
     Returns (fig, ax) or (fig, axes_array) to match matplotlib exactly.
     """
     # global _current_figure, _current_axes
-
-    fig = figure(**kwargs)
+    prod = nrows * ncols
+    fig = figure(ncanvases=prod, **kwargs)
     axes = []
-    for i in range(nrows * ncols):
+    for i in range(prod):
         ax = fig.add_subplot(nrows, ncols, i + 1)
         axes.append(ax)
     # print("axes", axes)
-    return fig, np.array(axes) if nrows * ncols > 1 else axes[0]
+    return fig, np.array(axes) if prod > 1 else axes[0]
 
     # if nrows == 1 and ncols == 1:
     #     ax = fig.mpl_figure.add_subplot(nrows, ncols, 1)

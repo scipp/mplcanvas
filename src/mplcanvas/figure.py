@@ -1,4 +1,6 @@
 # mplcanvas/figure.py
+from contextlib import nullcontext
+
 import ipywidgets as ipw
 import matplotlib
 from ipycanvas import Canvas, MultiCanvas, hold_canvas
@@ -76,6 +78,7 @@ class Figure(ipw.HBox):
         # self._auto_draw = True
 
     def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> Axes:
+        print(f"Adding subplot {nrows}x{ncols} index {index}")
         new_axes = self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
         self._axes_to_canvas[id(new_axes)] = index
         self._canvas_to_axes[index] = new_axes
@@ -173,9 +176,10 @@ class Figure(ipw.HBox):
         # Let the parent VBox handle the representation
         return super()._repr_mimebundle_(include=include, exclude=exclude)
 
-    def _draw_canvas(self, canvas, index):
+    def _draw_canvas(self, canvas, index, hold=True):
         """Render the entire figure"""
-        with hold_canvas(canvas):
+        ctx = hold_canvas(canvas) if hold else nullcontext()
+        with ctx:
             # Clear canvas
             canvas.clear()
 
@@ -184,6 +188,7 @@ class Figure(ipw.HBox):
             canvas.fill_rect(0, 0, self.width, self.height)
 
             ax = self._canvas_to_axes[index]
+            # print(f"Drawing axes {index} {ax}")
             draw_axes(ax, canvas)
 
             # # Draw all axes
@@ -201,8 +206,9 @@ class Figure(ipw.HBox):
         index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
         if index is None:
             # Redraw all canvases
-            for i in range(len(self.canvas._canvases) - 1):
-                self._draw_canvas(self.canvas[i], index=i + 1)
+            with hold_canvas(self.canvas):
+                for i in range(len(self.canvas._canvases) - 1):
+                    self._draw_canvas(self.canvas[i], index=i + 1, hold=False)
         else:
             # if index < 1 or index >= len(self.canvas.canvases):
             #     raise ValueError(f"Invalid axes index {index}")

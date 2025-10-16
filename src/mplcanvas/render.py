@@ -88,11 +88,11 @@ def draw_axes(ax, canvas):
     # height = ymax_disp - ymin_disp
     # print(f"Drawing axes at {xmin_disp},{ymin_disp} size {width}x{height}")
 
-    # Set clipping region to axes area
-    canvas.save()
-    canvas.begin_path()
-    canvas.rect(xmin_disp, ymin_disp, width, height)
-    canvas.clip()
+    # # Set clipping region to axes area
+    # canvas.save()
+    # canvas.begin_path()
+    # canvas.rect(xmin_disp, ymin_disp, width, height)
+    # canvas.clip()
 
     # Draw all line artists
     for line in ax.lines:
