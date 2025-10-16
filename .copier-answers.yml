@@ -1,0 +1,13 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 47497b5
+_src_path: https://github.com/scipp/copier_template.git
+description: Matplotlib clone that draws on an ipycanvas
+max_python: '3.13'
+min_python: '3.11'
+namespace_package: ''
+nightly_deps: ''
+orgname: scipp
+prettyname: Mplcanvas
+projectname: mplcanvas
+related_projects: ''
+year: 2025
