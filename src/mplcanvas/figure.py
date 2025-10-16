@@ -38,13 +38,13 @@ class Figure(ipw.HBox):
         layout = ipw.Layout(width=f"{self.width}px", height=f"{self.height}px")
 
         # Create the canvas
-        self.multicanvas = MultiCanvas(
+        self.canvas = MultiCanvas(
             ncanvases + 1, width=self.width, height=self.height, layout=layout
         )
-        # self.multicanvas[0].style = {"zIndex": 0}  # Background
+        # self.canvas[0].style = {"zIndex": 0}  # Background
 
-        self.drawing_canvas = self.multicanvas[-1]
-        # self.canvas = self.multicanvas[0]
+        self.drawing_canvas = self.canvas[-1]
+        # self.canvas = self.canvas[0]
 
         # self.canvas = Canvas(width=self.width, height=self.height, layout=layout)
 
@@ -60,7 +60,7 @@ class Figure(ipw.HBox):
 
         # Initialize as VBox with canvas as child
         super().__init__(
-            children=[self.toolbar, ipw.VBox([self.multicanvas, self.status_bar])],
+            children=[self.toolbar, ipw.VBox([self.canvas, self.status_bar])],
             # children=[ipw.VBox([self.canvas])],
             **kwargs,
         )
@@ -201,12 +201,12 @@ class Figure(ipw.HBox):
         index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
         if index is None:
             # Redraw all canvases
-            for i in range(len(self.multicanvas._canvases) - 1):
-                self._draw_canvas(self.multicanvas[i], index=i)
+            for i in range(len(self.canvas._canvases) - 1):
+                self._draw_canvas(self.canvas[i], index=i + 1)
         else:
-            # if index < 1 or index >= len(self.multicanvas.canvases):
+            # if index < 1 or index >= len(self.canvas.canvases):
             #     raise ValueError(f"Invalid axes index {index}")
-            self._draw_canvas(self.multicanvas[index], index=index)
+            self._draw_canvas(self.canvas[index], index=index)
 
     def show(self):
         """

@@ -160,9 +160,9 @@ class Toolbar(widgets.VBox):
         # """Connect to all existing axes in the figure"""
         # for axes in self.figure.axes:
         #     self.add_axes(axes)
-        self.figure.multicanvas.on_mouse_down(self._on_canvas_mouse_down)
-        self.figure.multicanvas.on_mouse_up(self._on_canvas_mouse_up)
-        self.figure.multicanvas.on_mouse_move(self._on_canvas_mouse_move)
+        self.figure.canvas.on_mouse_down(self._on_canvas_mouse_down)
+        self.figure.canvas.on_mouse_up(self._on_canvas_mouse_up)
+        self.figure.canvas.on_mouse_move(self._on_canvas_mouse_move)
 
     def _on_canvas_mouse_move(self, x: float, y: float):
         """Handle canvas mouse move events"""
@@ -258,7 +258,7 @@ class Toolbar(widgets.VBox):
         # Update limits and redraw
         ax.set(xlim=new_xlim, ylim=new_ylim)
         # self.figure.mpl_figure.canvas.draw_idle()
-        self.figure.draw(ax)
+        self.figure.draw(ax=ax)
 
     def _end_pan(self):
         """End panning operation"""
