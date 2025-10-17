@@ -22,6 +22,26 @@ def draw_line(line, ax, canvas):
     canvas.stroke_lines(points)
 
 
+def draw_collection(collection, ax, canvas):
+    # Currently, only support scatter collections
+    offsets = collection.get_offsets()
+    if len(offsets) == 0:
+        return
+    xdata, ydata = offsets[:, 0], offsets[:, 1]
+    x, y = ax.transData.transform(np.array((xdata, ydata)).T).T
+    y = flip_y(y, canvas)
+
+    canvas.fill_style = to_hex(collection.get_facecolor())
+    canvas.stroke_style = to_hex(collection.get_edgecolor())
+    # canvas.line_width = collection.get_linewidth()
+    # Use numpy array for efficient drawing
+    # points = np.column_stack([x, y])
+    size = collection.get_sizes() ** 0.5
+    if len(size) == 1:
+        size = size[0]
+    canvas.fill_circles(x, y, size)
+
+
 def draw_ticks_and_labels(ax, canvas):
     # Draw ticks and labels on all sides
     tick_length = 6
@@ -120,6 +140,10 @@ def draw_axes(ax, canvas):
     # Draw all line artists
     for line in ax.lines:
         draw_line(line, ax, canvas)
+
+    # Draw all collections
+    for collection in ax.collections:
+        draw_collection(collection, ax, canvas)
 
     # # Draw frame
     # xmin, xmax = ax.get_xlim()
