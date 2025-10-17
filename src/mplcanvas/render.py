@@ -4,7 +4,7 @@ from matplotlib.colors import to_hex
 from .utils import flip_y
 
 
-def draw_line(line, ax, canvas):
+def draw_line(line, ax, canvas, limits):
     # Get data coordinates
     xdata = line.get_xdata()
     ydata = line.get_ydata()
@@ -22,24 +22,38 @@ def draw_line(line, ax, canvas):
     canvas.stroke_lines(points)
 
 
-def draw_collection(collection, ax, canvas):
+def draw_collection(collection, ax, canvas, limits):
     # Currently, only support scatter collections
     offsets = collection.get_offsets()
     if len(offsets) == 0:
         return
     xdata, ydata = offsets[:, 0], offsets[:, 1]
+
+    # Select only points within limits
+    mask = xdata >= limits['xmin']
+    mask &= xdata <= limits['xmax']
+    mask &= ydata >= limits['ymin']
+    mask &= ydata <= limits['ymax']
+    if mask.sum() == 0:
+        return
+    xdata = xdata[mask]
+    ydata = ydata[mask]
+
     x, y = ax.transData.transform(np.array((xdata, ydata)).T).T
     y = flip_y(y, canvas)
 
     canvas.fill_style = to_hex(collection.get_facecolor())
     canvas.stroke_style = to_hex(collection.get_edgecolor())
-    # canvas.line_width = collection.get_linewidth()
-    # Use numpy array for efficient drawing
-    # points = np.column_stack([x, y])
+
     size = collection.get_sizes() ** 0.5
     if len(size) == 1:
         size = size[0]
-    canvas.fill_circles(x, y, size)
+
+    first_path = collection.get_paths()[0]
+    if len(first_path.vertices) == 5:
+        canvas.fill_rects(x, y, size)  # Square markers have 5 vertices
+    else:
+        canvas.fill_circles(x, y, size)
 
 
 def draw_ticks_and_labels(ax, canvas):
@@ -124,6 +138,8 @@ def draw_axes(ax, canvas):
     width = xmax_disp - xmin_disp
     height = ymax_disp - ymin_disp
 
+    limits = {'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax}
+
     # (xmin_disp, ymin_disp), (xmax_disp, ymax_disp) = ax.transData.transform(
     #     ((xmin, ymin), (xmax, ymax))
     # )
@@ -139,11 +155,11 @@ def draw_axes(ax, canvas):
 
     # Draw all line artists
     for line in ax.lines:
-        draw_line(line, ax, canvas)
+        draw_line(line, ax, canvas, limits=limits)
 
     # Draw all collections
     for collection in ax.collections:
-        draw_collection(collection, ax, canvas)
+        draw_collection(collection, ax, canvas, limits=limits)
 
     # # Draw frame
     # xmin, xmax = ax.get_xlim()
