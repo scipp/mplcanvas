@@ -22,11 +22,12 @@ class Toolbar(widgets.VBox):
 
         # Tool state
         self._active_tool = None  # 'zoom', 'pan', or None
-        self._zoom_rect_start = None
-        # self._pan_start_canvas = None
-        self._pan_start = None
-        self._pan_start_point = None
-        self._pan_start_limits = None
+        # self._zoom_rect_start = None
+        # self._pan_info_canvas = None
+        self._pan_info = None
+        # self._pan_info_point = None
+        # self._pan_info_limits = None
+        self._zoom_info = None
         self._active_axes = None  # Which axes is currently being interacted with
         self._tools_lock = False
 
@@ -172,11 +173,11 @@ class Toolbar(widgets.VBox):
         y = flip_y(y, self.figure.canvas)
         if self._active_axes is None:
             ax = self.figure._find_axes_at_position((x, y))
+            if ax is None:
+                self.figure.status_bar.value = ""
+                return
         else:
             ax = self._active_axes
-        if ax is None:
-            self.figure.status_bar.value = ""
-            return
 
         inv = ax.transData.inverted()
         data_x, data_y = inv.transform((x, y))
@@ -185,7 +186,7 @@ class Toolbar(widgets.VBox):
         if self._active_tool == "pan":
             # self._do_pan(ax, data_x, data_y)
             self._do_pan(x, y)
-        elif self._active_tool == "zoom" and self._zoom_rect_start is not None:
+        elif self._active_tool == "zoom" and self._zoom_info is not None:
             self._update_zoom_preview(x, canvas_y)
 
     def _on_canvas_mouse_down(self, x: float, y: float):
@@ -208,9 +209,10 @@ class Toolbar(widgets.VBox):
         #     return
 
     def _on_canvas_mouse_up(self, x: float, y: float):
-        if self._active_tool == "pan" and self._pan_start is not None:
+        if self._active_tool == "pan" and self._pan_info is not None:
             self._end_pan()
         elif self._active_tool == "zoom":
+            print("Ending zoom", x, y)
             self._end_zoom(x, y)
 
     # In toolbar _start_pan:
@@ -221,14 +223,14 @@ class Toolbar(widgets.VBox):
 
         # inv = ax.transData.inverted()
         # data_x, data_y = inv.transform((x, y))
-        # self._pan_start_point = (data_x, data_y)
+        # self._pan_info_point = (data_x, data_y)
         xlim, ylim = ax.get_xlim(), ax.get_ylim()
 
         xy_canvas = ax.transData.transform(((xlim[0], ylim[0]), (xlim[1], ylim[1])))
         xlim_canvas = (xy_canvas[0][0], xy_canvas[1][0])
         ylim_canvas = (xy_canvas[0][1], xy_canvas[1][1])
 
-        self._pan_start = {
+        self._pan_info = {
             "origin": (x, y),
             "limits": (xlim, ylim),
             "scale": (
@@ -237,32 +239,32 @@ class Toolbar(widgets.VBox):
             ),
         }
 
-        # self._pan_start_limits = (ax.get_xlim(), ax.get_ylim())
-        # print("self._pan_start_point", self._pan_start_point)
+        # self._pan_info_limits = (ax.get_xlim(), ax.get_ylim())
+        # print("self._pan_info_point", self._pan_info_point)
 
     # def _do_pan(self, ax, data_x, data_y):
     def _do_pan(self, x, y):
         # """Perform panning using canvas coordinate deltas"""
-        # print(self._pan_start_canvas, self._pan_start_limits, self._active_axes)
+        # print(self._pan_info_canvas, self._pan_info_limits, self._active_axes)
         if (
-            self._pan_start is None
-            # or self._pan_start_limits is None
+            self._pan_info is None
+            # or self._pan_info_limits is None
             # or self._active_axes is None
         ):
             return
 
         ax = self._active_axes
 
-        dx = (x - self._pan_start["origin"][0]) * self._pan_start["scale"][0]
-        dy = (y - self._pan_start["origin"][1]) * self._pan_start["scale"][1]
+        dx = (x - self._pan_info["origin"][0]) * self._pan_info["scale"][0]
+        dy = (y - self._pan_info["origin"][1]) * self._pan_info["scale"][1]
 
         # Apply pan using original limits as reference
-        start_xlim, start_ylim = self._pan_start["limits"]
+        start_xlim, start_ylim = self._pan_info["limits"]
 
-        # print("start point", self._pan_start_point)
+        # print("start point", self._pan_info_point)
         # print("data point", (data_x, data_y))
         # print("delta", (dx, dy))
-        # print("start limits", self._pan_start_limits)
+        # print("start limits", self._pan_info_limits)
 
         new_xlim = (start_xlim[0] - dx, start_xlim[1] - dx)
         new_ylim = (start_ylim[0] - dy, start_ylim[1] - dy)
@@ -275,197 +277,40 @@ class Toolbar(widgets.VBox):
 
     def _end_pan(self):
         """End panning operation"""
-        self._pan_start = None
+        self._pan_info = None
         self._active_axes = None
-        # self._pan_start_limits = None
+        # self._pan_info_limits = None
         # self._active_axes = None
 
     def _start_zoom(self, x, y):
         """Start zoom selection on the active axes"""
-        self._zoom_rect_start = (x, y)
         ax = self._active_axes
-
-    # def _get_active_tool(self):
-    #     """Return the currently active tool"""
-    #     for name, tool in self.tools.items():
-    #         if getattr(tool, "value", False):
-    #             return name
-    #     return None
-
-    # # Pan implementation (now works on self._active_axes)
-    # def _start_pan(self, event):
-    #     """Start panning operation on the active axes"""
-    #     self._pan_start = (event.data_x, event.data_y)
-    #     self._pan_start_limits = (
-    #         self._active_axes.get_xlim(),
-    #         self._active_axes.get_ylim(),
-    #     )
-    #     # self.status_label.value = "Panning axes..."
-
-    # # def _do_pan(self, event):
-    # #     """Perform panning on the active axes"""
-    # #     if (
-    # #         self._pan_start is None
-    # #         or self._pan_start_limits is None
-    # #         or self._active_axes is None
-    # #     ):
-    # #         return
-
-    # #     # Calculate delta in data coordinates
-    # #     dx = event.data_x - self._pan_start[0]
-    # #     dy = event.data_y - self._pan_start[1]
-
-    # #     # Apply pan (move in opposite direction)
-    # #     start_xlim, start_ylim = self._pan_start_limits
-    # #     new_xlim = (start_xlim[0] - dx, start_xlim[1] - dx)
-    # #     new_ylim = (start_ylim[0] - dy, start_ylim[1] - dy)
-
-    # #     self._active_axes.set_xlim(*new_xlim)
-    # #     self._active_axes.set_ylim(*new_ylim)
-    # def _do_pan(self, event):
-    #     """Perform panning with single batched update"""
-    #     if (
-    #         self._pan_start is None
-    #         or self._pan_start_limits is None
-    #         or self._active_axes is None
-    #     ):
-    #         return
-
-    #     # Calculate delta in data coordinates
-    #     dx = event.data_x - self._pan_start[0]
-    #     dy = event.data_y - self._pan_start[1]
-
-    #     # Apply pan (move in opposite direction)
-    #     start_xlim, start_ylim = self._pan_start_limits
-    #     new_xlim = (start_xlim[0] - dx, start_xlim[1] - dx)
-    #     new_ylim = (start_ylim[0] - dy, start_ylim[1] - dy)
-
-    #     # ✅ Update both limits then draw once
-    #     self._active_axes.set_xlim(*new_xlim)
-    #     self._active_axes.set_ylim(*new_ylim)
-    #     self.figure.draw()  # Single draw with hold_canvas
-
-    # # In toolbar _start_pan:
-    # def _start_pan(self, ax, x, y):
-    #     """Start panning operation on the active axes"""
-    #     # self._pan_start_canvas = (
-    #     #     event.canvas_x,
-    #     #     event.canvas_y,
-    #     # )  # ✅ Store canvas coords
-
-    #     inv = ax.transData.inverted()
-    #     data_x, data_y = inv.transform((x, y))
-    #     self._pan_start_point = (data_x, data_y)
-
-    #     self._pan_start_limits = (ax.get_xlim(), ax.get_ylim())
-
-    # # Store the coordinate transform parameters at pan start
-    # self._pan_axes_bounds = {
-    #     "x": self._active_axes.x,
-    #     "y": self._active_axes.y,
-    #     "width": self._active_axes.width,
-    #     "height": self._active_axes.height,
-    #     "xlim": self._pan_start_limits[0],
-    #     "ylim": self._pan_start_limits[1],
-    # }
-
-    # # print(self._pan_axes_bounds)  # Debug
-
-    # # self.status_label.value = "Panning axes..."
-
-    # def _do_pan(self, event):
-    #     """Perform panning using canvas coordinate deltas"""
-    #     # print(self._pan_start_canvas, self._pan_start_limits, self._active_axes)
-    #     if (
-    #         self._pan_start_canvas is None
-    #         or self._pan_start_limits is None
-    #         or self._active_axes is None
-    #     ):
-    #         return
-
-    #     # Calculate delta in CANVAS coordinates (stable reference)
-    #     dx_canvas = event.canvas_x - self._pan_start_canvas[0]
-    #     dy_canvas = event.canvas_y - self._pan_start_canvas[1]
-
-    #     # Convert canvas deltas to data deltas using ORIGINAL transform parameters
-    #     bounds = self._pan_axes_bounds
-    #     dx_data = (dx_canvas / bounds["width"]) * (
-    #         bounds["xlim"][1] - bounds["xlim"][0]
-    #     )
-    #     dy_data = -(dy_canvas / bounds["height"]) * (
-    #         bounds["ylim"][1] - bounds["ylim"][0]
-    #     )  # Note: negative for Y
-
-    #     # Apply pan using original limits as reference
-    #     start_xlim, start_ylim = self._pan_start_limits
-    #     new_xlim = (start_xlim[0] - dx_data, start_xlim[1] - dx_data)
-    #     new_ylim = (start_ylim[0] - dy_data, start_ylim[1] - dy_data)
-
-    #     # Update limits and redraw
-    #     self._active_axes.set_xlim(*new_xlim)
-    #     self._active_axes.set_ylim(*new_ylim)
-    #     self.figure.draw()
-
-    # def _end_pan(self):
-    #     """End panning operation"""
-    #     self._pan_start = None
-    #     self._pan_start_limits = None
-    #     self._active_axes = None
-    # self.status_label.value = "Pan complete"
-
-    # Zoom implementation (now works on self._active_axes)
-    # def _start_zoom(self, event):
-    #     """Start zoom selection on the active axes"""
-    #     self._zoom_rect_start = (event.data_x, event.data_y)
-    #     self._zoom_rect_visible = True
-    #     # self.status_label.value = "Selecting zoom region..."
-
-    # def _update_zoom_preview(self, event):
-    #     """Update zoom rectangle preview"""
-    #     if self._zoom_rect_start is not None and self._active_axes is not None:
-    #         x0, y0 = self._zoom_rect_start
-    #         x1, y1 = event.data_x, event.data_y
-    #         width = abs(x1 - x0)
-    #         height = abs(y1 - y0)
-    #         # self.status_label.value = f"Zoom region: {width:.2f} × {height:.2f}"
-
-    # def _end_zoom(self, event):
-    #     """Complete zoom operation on the active axes"""
-    #     if self._zoom_rect_start is None or self._active_axes is None:
-    #         return
-
-    #     x0, y0 = self._zoom_rect_start
-    #     x1, y1 = event.data_x, event.data_y
-
-    #     # Ensure we have a proper rectangle (not just a click)
-    #     min_size = 0.01  # Minimum zoom region size
-    #     if abs(x1 - x0) < min_size or abs(y1 - y0) < min_size:
-    #         # self.status_label.value = "Zoom region too small"
-    #         self._zoom_rect_start = None
-    #         self._active_axes = None
-    #         return
-
-    #     # Set new limits on the active axes
-    #     new_xlim = (min(x0, x1), max(x0, x1))
-    #     new_ylim = (min(y0, y1), max(y0, y1))
-
-    #     self._active_axes.set_xlim(*new_xlim)
-    #     self._active_axes.set_ylim(*new_ylim)
-
-    #     self._zoom_rect_start = None
-    #     self._active_axes = None
-    #     # self.status_label.value = "Zoomed"
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
+        # Convert limits to canvas coordinates
+        (xmin_canvas, ymin_canvas), (xmax_canvas, ymax_canvas) = ax.transData.transform(
+            ((xlim[0], ylim[0]), (xlim[1], ylim[1]))
+        )
+        self._zoom_info = {
+            "origin": (x, y),
+            "xmin": xmin_canvas,
+            "xmax": xmax_canvas,
+            "ymin": ymin_canvas,
+            "ymax": ymax_canvas,
+        }
 
     def _update_zoom_preview(self, x: float, y: float):
         """Optimized zoom rectangle with minimal redraw"""
-        if self._zoom_rect_start is None or self._active_axes is None:
+        if self._zoom_info is None or self._active_axes is None:
             return
         # Use the same pattern as pure ipycanvas example
         canvas = self.figure.drawing_canvas
 
         # Add zoom rectangle
-        x1, y1 = self._zoom_rect_start
+        x1, y1 = self._zoom_info["origin"]
         x2, y2 = x, y
+
+        x2 = max(self._zoom_info["xmin"], min(self._zoom_info["xmax"], x2))
+        y2 = max(self._zoom_info["ymin"], min(self._zoom_info["ymax"], y2))
 
         # print(x1, y1)
         # print(x2, y2)
@@ -508,7 +353,7 @@ class Toolbar(widgets.VBox):
         """Complete zoom operation on the active axes"""
         # if self._zoom_rect_start is None or self._active_axes is None:
         #     return
-        self._zoom_rect_start = None
+        self._zoom_info = None
         self.figure.drawing_canvas.clear()
         # self.figure.draw()
         return
