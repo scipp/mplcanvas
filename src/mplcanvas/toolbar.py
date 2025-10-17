@@ -388,8 +388,8 @@ class Toolbar(widgets.VBox):
         # new_xlim = (min(x0, x1), max(x0, x1))
         # new_ylim = (min(y0, y1), max(y0, y1))
 
-        self._active_axes.set_xlim(xdata_1, xdata_2)
-        self._active_axes.set_ylim(ydata_1, ydata_2)
+        self._active_axes.set_xlim(sorted([xdata_1, xdata_2]))
+        self._active_axes.set_ylim(sorted([ydata_1, ydata_2]))
 
         # Clean up
         # self.status_label.value = "Zoomed"
