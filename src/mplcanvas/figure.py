@@ -3,15 +3,14 @@ from contextlib import nullcontext
 
 import ipywidgets as ipw
 import matplotlib
-from ipycanvas import Canvas, MultiCanvas, hold_canvas
+from ipycanvas import MultiCanvas, hold_canvas
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure as MplFigure
 
-matplotlib.use("Agg")  # Headless backend
-
-# from .axes import Axes
 from .render import draw_axes
 from .toolbar import Toolbar
+
+matplotlib.use("Agg")
 
 
 class Figure(ipw.HBox):
@@ -22,14 +21,8 @@ class Figure(ipw.HBox):
     and implements _repr_mimebundle_ for automatic Jupyter display.
     """
 
-    def __init__(
-        self,
-        facecolor: str = "white",
-        # toolbar: bool = True,
-        ncanvases: int = 1,
-        **kwargs,
-    ):
-        self.mpl_figure = MplFigure(facecolor=facecolor, **kwargs)
+    def __init__(self, ncanvases: int = 1, **kwargs):
+        self.mpl_figure = MplFigure(**kwargs)
 
         # Convert figsize from inches to pixels
         self.figsize = self.mpl_figure.get_size_inches()
@@ -39,87 +32,28 @@ class Figure(ipw.HBox):
 
         layout = ipw.Layout(width=f"{self.width}px", height=f"{self.height}px")
 
-        # Create the canvas
+        # Create the canvas: one per axes plus one for drawing overlays
         self.canvas = MultiCanvas(
             ncanvases + 1, width=self.width, height=self.height, layout=layout
         )
-        # self.canvas[0].style = {"zIndex": 0}  # Background
-
         self.drawing_canvas = self.canvas[-1]
-        # self.canvas = self.canvas[0]
 
-        # self.canvas = Canvas(width=self.width, height=self.height, layout=layout)
-
-        # Create toolbar if requested
         self.toolbar = Toolbar(figure=self)
-        # if toolbar:
-        #     # We'll create the toolbar after adding the first axes
-        #     self._toolbar_enabled = True
-        # else:
-        #     self._toolbar_enabled = False
+        self.status_bar = ipw.Label(value="")
 
-        self.status_bar = ipw.Label(value="")  # Placeholder for status messages
-
-        # Initialize as VBox with canvas as child
         super().__init__(
-            children=[self.toolbar, ipw.VBox([self.canvas, self.status_bar])],
-            # children=[ipw.VBox([self.canvas])],
-            **kwargs,
+            children=[self.toolbar, ipw.VBox([self.canvas, self.status_bar])], **kwargs
         )
 
-        # Container for all axes
+        # Canvas to axes mapping
         self._axes_to_canvas = {}
         self._canvas_to_axes = {}
 
-        # Figure-level properties
-        self.facecolor = facecolor
-
-        # # Auto-draw on creation
-        # self._auto_draw = True
-
     def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> Axes:
-        # print(f"Adding subplot {nrows}x{ncols} index {index}")
         new_axes = self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
         self._axes_to_canvas[id(new_axes)] = index - 1
         self._canvas_to_axes[index - 1] = new_axes
-
-        # print("self._axes_to_canvas", self._axes_to_canvas)
-        # print("self._canvas_to_axes", self._canvas_to_axes)
         return new_axes
-
-        # """Add a subplot to the figure"""
-        # from .axes import Axes  # Import here to avoid circular imports
-
-        # # For now, only support single subplot
-        # if nrows == 1 and ncols == 1 and index == 1:
-        #     # Calculate axes position (leave margin for labels)
-        #     margin_left = 80
-        #     margin_right = 20
-        #     margin_top = 20
-        #     margin_bottom = 60
-
-        #     ax_x = margin_left
-        #     ax_y = margin_top
-        #     ax_width = self.width - margin_left - margin_right
-        #     ax_height = self.height - margin_top - margin_bottom
-
-        #     ax = Axes(self, (ax_x, ax_y, ax_width, ax_height))
-        #     self.axes.append(ax)
-
-        #     # If toolbar exists, register this new axes with it
-        #     if self.toolbar is not None:
-        #         self.toolbar.add_axes(ax)
-
-        #     # Create toolbar if this is the first axes
-        #     if self._toolbar_enabled and self.toolbar is None:
-        #         self._create_toolbar()
-        #         # Register this axes with the new toolbar
-        #         self.toolbar.add_axes(ax)
-        #     return ax
-        # else:
-        #     raise NotImplementedError("Multiple subplots not yet supported")
-
-    # Update the _create_toolbar method in mplcanvas/figure.py
 
     @property
     def axes(self):
