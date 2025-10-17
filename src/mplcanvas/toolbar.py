@@ -33,10 +33,10 @@ class Toolbar(widgets.VBox):
         # Store home views for all axes (will be populated as axes are added)
         self._home_views = {}  # {axes_id: (xlim, ylim)}
 
-        # Zoom rectangle state
-        self._zoom_rect_start = None
-        self._zoom_rect_current = None
-        self._zoom_rect_visible = False
+        # # Zoom rectangle state
+        # self._zoom_rect_start = None
+        # self._zoom_rect_current = None
+        # self._zoom_rect_visible = False
 
         button_layout = widgets.Layout(width="37px", padding="0px 0px 0px 0px")
 
@@ -131,7 +131,7 @@ class Toolbar(widgets.VBox):
         if change["new"]:  # Button toggled on
             self._active_tool = "zoom"
             self.pan_button.value = False  # Deactivate pan if active
-            self._clear_zoom_rectangle()  # Clear any active rectangle
+            # self._clear_zoom_rectangle()  # Clear any active rectangle
 
             # self.status_label.value = (
             #     "Zoom tool active - drag on any plot to select region"
@@ -168,8 +168,12 @@ class Toolbar(widgets.VBox):
         """Handle canvas mouse move events"""
         # Always track mouse position for cursor display
         # self._current_mouse_pos = (x, y)
+        canvas_y = y
         y = flip_y(y, self.figure.canvas)
-        ax = self.figure._find_axes_at_position((x, y))
+        if self._active_axes is None:
+            ax = self.figure._find_axes_at_position((x, y))
+        else:
+            ax = self._active_axes
         if ax is None:
             self.figure.status_bar.value = ""
             return
@@ -180,22 +184,25 @@ class Toolbar(widgets.VBox):
 
         if self._active_tool == "pan":
             # self._do_pan(ax, data_x, data_y)
-            self._do_pan(ax, x, y)
+            self._do_pan(x, y)
+        elif self._active_tool == "zoom" and self._zoom_rect_start is not None:
+            self._update_zoom_preview(x, canvas_y)
 
     def _on_canvas_mouse_down(self, x: float, y: float):
         """Handle mouse press for active tools"""
+        canvas_y = y
         y = flip_y(y, self.figure.canvas)
-        ax = self.figure._find_axes_at_position((x, y))
-        if (ax is None) or (self._active_tool is None):
+        self._active_axes = self.figure._find_axes_at_position((x, y))
+        if (self._active_axes is None) or (self._active_tool is None):
             return
 
         if self._active_tool == "pan":
             # self._active_axes = self._determine_active_axes(event)
             # if self._active_axes:
-            self._start_pan(ax, x, y)
+            self._start_pan(x, y)
         elif self._active_tool == "zoom":
             # self._active_axes = self._determine_active_axes(event)
-            self._start_zoom(ax, x, y)
+            self._start_zoom(x, canvas_y)
 
         # if not self._point_in_axes(x, y):
         #     return
@@ -203,10 +210,14 @@ class Toolbar(widgets.VBox):
     def _on_canvas_mouse_up(self, x: float, y: float):
         if self._active_tool == "pan" and self._pan_start is not None:
             self._end_pan()
+        elif self._active_tool == "zoom":
+            self._end_zoom(x, y)
 
     # In toolbar _start_pan:
-    def _start_pan(self, ax, x, y):
+    def _start_pan(self, x, y):
         """Start panning operation on the active axes"""
+
+        ax = self._active_axes
 
         # inv = ax.transData.inverted()
         # data_x, data_y = inv.transform((x, y))
@@ -230,7 +241,7 @@ class Toolbar(widgets.VBox):
         # print("self._pan_start_point", self._pan_start_point)
 
     # def _do_pan(self, ax, data_x, data_y):
-    def _do_pan(self, ax, x, y):
+    def _do_pan(self, x, y):
         # """Perform panning using canvas coordinate deltas"""
         # print(self._pan_start_canvas, self._pan_start_limits, self._active_axes)
         if (
@@ -239,6 +250,8 @@ class Toolbar(widgets.VBox):
             # or self._active_axes is None
         ):
             return
+
+        ax = self._active_axes
 
         dx = (x - self._pan_start["origin"][0]) * self._pan_start["scale"][0]
         dy = (y - self._pan_start["origin"][1]) * self._pan_start["scale"][1]
@@ -263,12 +276,14 @@ class Toolbar(widgets.VBox):
     def _end_pan(self):
         """End panning operation"""
         self._pan_start = None
+        self._active_axes = None
         # self._pan_start_limits = None
         # self._active_axes = None
 
-    def _start_zoom(self, ax, x, y):
+    def _start_zoom(self, x, y):
         """Start zoom selection on the active axes"""
         self._zoom_rect_start = (x, y)
+        ax = self._active_axes
 
     # def _get_active_tool(self):
     #     """Return the currently active tool"""
@@ -276,38 +291,6 @@ class Toolbar(widgets.VBox):
     #         if getattr(tool, "value", False):
     #             return name
     #     return None
-
-    # Mouse event handlers
-    def _on_mouse_move(self, event):
-        """Handle mouse movement for active tools"""
-        if self._active_tool == "pan" and self._pan_start_canvas is not None:
-            # Continue pan on the same axes we started on
-            if self._active_axes == event.inaxes:
-                self._do_pan(event)
-        elif self._active_tool == "zoom" and self._zoom_rect_start is not None:
-            # Continue zoom on the same axes we started on
-            if self._active_axes == event.inaxes:
-                self._update_zoom_preview(event)
-
-    def _on_mouse_press(self, event):
-        """Handle mouse press for active tools"""
-        if self._active_tool == "pan":
-            self._active_axes = self._determine_active_axes(event)
-            if self._active_axes:
-                self._start_pan(event)
-        elif self._active_tool == "zoom":
-            self._active_axes = self._determine_active_axes(event)
-            if self._active_axes:
-                self._start_zoom(event)
-
-    def _on_mouse_release(self, event):
-        """Handle mouse release for active tools"""
-        if self._active_tool == "pan" and self._pan_start_canvas is not None:
-            if self._active_axes == self._determine_active_axes(event):
-                self._end_pan()
-        elif self._active_tool == "zoom" and self._zoom_rect_start is not None:
-            if self._active_axes == self._determine_active_axes(event):
-                self._end_zoom(event)
 
     # # Pan implementation (now works on self._active_axes)
     # def _start_pan(self, event):
@@ -473,13 +456,19 @@ class Toolbar(widgets.VBox):
     #     self._active_axes = None
     #     # self.status_label.value = "Zoomed"
 
-    def _draw_zoom_rectangle(self, start_canvas, end_canvas):
-        """Draw zoom rectangle on the canvas"""
-        if not self._zoom_rect_visible:
+    def _update_zoom_preview(self, x: float, y: float):
+        """Optimized zoom rectangle with minimal redraw"""
+        if self._zoom_rect_start is None or self._active_axes is None:
             return
+        # Use the same pattern as pure ipycanvas example
+        canvas = self.figure.drawing_canvas
 
-        x1, y1 = start_canvas
-        x2, y2 = end_canvas
+        # Add zoom rectangle
+        x1, y1 = self._zoom_rect_start
+        x2, y2 = x, y
+
+        # print(x1, y1)
+        # print(x2, y2)
 
         # Calculate rectangle coordinates
         rect_x = min(x1, x2)
@@ -487,82 +476,42 @@ class Toolbar(widgets.VBox):
         rect_width = abs(x2 - x1)
         rect_height = abs(y2 - y1)
 
-        # Draw rectangle with dashed border
-        canvas = self.figure.canvas
-        canvas.save()
+        with hold_canvas(canvas):
+            # Redraw figure content (same as figure.draw() internals)
+            canvas.clear()
+            # canvas.fill_style = self.figure.facecolor
+            # canvas.fill_rect(0, 0, self.figure.width, self.figure.height)
 
-        # Set rectangle style
-        canvas.stroke_style = "red"
-        canvas.line_width = 1
-        canvas.set_line_dash([5, 5])  # Dashed line
-        canvas.global_alpha = 0.8
+            # for ax in self.figure.axes:
+            #     ax.draw()
 
-        # Draw rectangle border
-        canvas.stroke_rect(rect_x, rect_y, rect_width, rect_height)
+            # # Draw rectangle with dashed border
+            # canvas = self.figure.drawing_canvas
+            # # canvas.save()
 
-        # Optional: fill with semi-transparent color
-        canvas.fill_style = "rgba(255, 0, 0, 0.1)"  # Light red
-        canvas.fill_rect(rect_x, rect_y, rect_width, rect_height)
+            # Set rectangle style
+            canvas.stroke_style = "black"
+            canvas.line_width = 1
+            # canvas.set_line_dash([5, 5])  # Dashed line
+            # canvas.global_alpha = 0.8
 
-        canvas.restore()
+            # Draw rectangle border
+            canvas.stroke_rect(rect_x, rect_y, rect_width, rect_height)
 
-    def _clear_zoom_rectangle(self):
-        """Clear the zoom rectangle by redrawing the figure"""
-        if self._zoom_rect_visible:
-            self._zoom_rect_visible = False
-            # Redraw the entire figure to clear the rectangle
-            self.figure.draw()
+            # # Optional: fill with semi-transparent color
+            # canvas.fill_style = "rgba(255, 0, 0, 0.1)"  # Light red
+            # canvas.fill_rect(rect_x, rect_y, rect_width, rect_height)
 
-    def _start_zoom(self, event):
-        """Start zoom selection on the active axes"""
-        self._zoom_rect_start = (event.data_x, event.data_y)
-        # Store canvas coordinates for rectangle drawing
-        self._zoom_rect_start_canvas = (event.canvas_x, event.canvas_y)
-        self._zoom_rect_visible = True
-        # self.status_label.value = "Selecting zoom region..."
+            # canvas.restore()
 
-    # def _update_zoom_preview(self, event):
-    #     """Update zoom rectangle preview"""
-    #     if self._zoom_rect_start is not None and self._active_axes is not None:
-    #         # Clear previous rectangle by redrawing
-    #         self.figure.draw()
-
-    #         # Draw new rectangle
-    #         self._draw_zoom_rectangle(
-    #             self._zoom_rect_start_canvas, (event.canvas_x, event.canvas_y)
-    #         )
-
-    #         # Update status
-    #         x0, y0 = self._zoom_rect_start
-    #         x1, y1 = event.data_x, event.data_y
-    #         width = abs(x1 - x0)
-    #         height = abs(y1 - y0)
-    #         # self.status_label.value = f"Zoom region: {width:.2f} × {height:.2f}"
-
-    def _update_zoom_preview(self, event):
-        """Optimized zoom rectangle with minimal redraw"""
-        if self._zoom_rect_start is not None and self._active_axes is not None:
-            # Use the same pattern as pure ipycanvas example
-            with hold_canvas(self.figure.canvas):
-                # Redraw figure content (same as figure.draw() internals)
-                self.figure.canvas.clear()
-                self.figure.canvas.fill_style = self.figure.facecolor
-                self.figure.canvas.fill_rect(
-                    0, 0, self.figure.width, self.figure.height
-                )
-
-                for ax in self.figure.axes:
-                    ax.draw()
-
-                # Add zoom rectangle
-                self._draw_zoom_rectangle(
-                    self._zoom_rect_start_canvas, (event.canvas_x, event.canvas_y)
-                )
-
-    def _end_zoom(self, event):
+    def _end_zoom(self, x, y):
         """Complete zoom operation on the active axes"""
-        if self._zoom_rect_start is None or self._active_axes is None:
-            return
+        # if self._zoom_rect_start is None or self._active_axes is None:
+        #     return
+        self._zoom_rect_start = None
+        self.figure.drawing_canvas.clear()
+        # self.figure.draw()
+        return
 
         # Clear the rectangle first
         self._clear_zoom_rectangle()
