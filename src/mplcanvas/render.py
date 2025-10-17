@@ -32,6 +32,8 @@ def draw_ticks_and_labels(ax, canvas):
     canvas.text_align = "center"
     canvas.text_baseline = "top"
 
+    # transform = ax.transData.transform
+
     # X axis ticks and labels (bottom)
     (xmin, xmax), (ymin, ymax) = ax.get_xlim(), ax.get_ylim()
     xticks = ax.get_xticks()
@@ -67,6 +69,27 @@ def draw_ticks_and_labels(ax, canvas):
         canvas.stroke()
         # Label
         canvas.fill_text(label, x - tick_length - label_offset, y)
+
+    xlabel = ax.xaxis.get_label()
+    ylabel = ax.yaxis.get_label()
+    xtext = xlabel.get_text()
+    ytext = ylabel.get_text()
+    canvas.text_align = "center"
+    canvas.text_baseline = "bottom"
+    if xtext:
+        x, y = ax.transAxes.transform(xlabel.get_position())
+        canvas.fill_text(xtext, x, canvas.height)
+    canvas.text_baseline = "top"
+    if ytext:
+        x, y = ax.transAxes.transform(ylabel.get_position())
+        y = flip_y(y, canvas)
+        # Need to rotate the text 90 degrees for y label
+        canvas.save()
+        canvas.translate(0, y)
+        canvas.rotate(-np.pi / 2)
+        canvas.fill_text(ytext, 0, 0)
+        canvas.restore()
+        # canvas.fill_text(ytext, x, y)
 
 
 def draw_axes(ax, canvas):

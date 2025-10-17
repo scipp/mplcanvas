@@ -212,7 +212,7 @@ class Toolbar(widgets.VBox):
         if self._active_tool == "pan" and self._pan_info is not None:
             self._end_pan()
         elif self._active_tool == "zoom":
-            print("Ending zoom", x, y)
+            # print("Ending zoom", x, y)
             self._end_zoom(x, y)
 
     # In toolbar _start_pan:
