@@ -78,10 +78,13 @@ class Figure(ipw.HBox):
         # self._auto_draw = True
 
     def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> Axes:
-        print(f"Adding subplot {nrows}x{ncols} index {index}")
+        # print(f"Adding subplot {nrows}x{ncols} index {index}")
         new_axes = self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
-        self._axes_to_canvas[id(new_axes)] = index
-        self._canvas_to_axes[index] = new_axes
+        self._axes_to_canvas[id(new_axes)] = index - 1
+        self._canvas_to_axes[index - 1] = new_axes
+
+        # print("self._axes_to_canvas", self._axes_to_canvas)
+        # print("self._canvas_to_axes", self._canvas_to_axes)
         return new_axes
 
         # """Add a subplot to the figure"""
@@ -133,37 +136,6 @@ class Figure(ipw.HBox):
                 return ax  # , axes_x, axes_y
         # return None, None, None
 
-    # def _create_toolbar(self, axes=None):
-    #     """Create and add the toolbar"""
-    #     from .ipw.toolbar import NavigationToolbar
-
-    #     # Toolbar operates on the entire figure, not a single axes
-    #     self.toolbar = NavigationToolbar(self)
-
-    #     # Update children to include toolbar on the left
-    #     self.children = [self.toolbar, self.canvas]
-
-    #     # # def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> 'Axes':
-    # #     """Add a subplot to the figure"""
-    # #     from .axes import Axes
-
-    # # ... existing subplot creation code ...
-
-    # ax = Axes(self, (ax_x, ax_y, ax_width, ax_height))
-    # self.axes.append(ax)
-
-    # # If toolbar exists, register this new axes with it
-    # if self.toolbar is not None:
-    #     self.toolbar.add_axes(ax)
-
-    # # Create toolbar if this is the first axes
-    # if self._toolbar_enabled and self.toolbar is None:
-    #     self._create_toolbar()
-    #     # Register this axes with the new toolbar
-    #     self.toolbar.add_axes(ax)
-
-    # return ax
-
     def _repr_mimebundle_(self, include=None, exclude=None):
         """
         Jupyter representation - this makes the figure display automatically
@@ -183,9 +155,9 @@ class Figure(ipw.HBox):
             # Clear canvas
             canvas.clear()
 
-            # Draw background
-            canvas.fill_style = self.facecolor
-            canvas.fill_rect(0, 0, self.width, self.height)
+            # # Draw background
+            # canvas.fill_style = self.facecolor
+            # canvas.fill_rect(0, 0, self.width, self.height)
 
             ax = self._canvas_to_axes[index]
             # print(f"Drawing axes {index} {ax}")
@@ -204,11 +176,12 @@ class Figure(ipw.HBox):
         If index is an integer, redraw only the specified axes (1-based index).
         """
         index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
+        # print(f"Figure.draw called with ax={id(ax)} index={index}")
         if index is None:
             # Redraw all canvases
             with hold_canvas(self.canvas):
                 for i in range(len(self.canvas._canvases) - 1):
-                    self._draw_canvas(self.canvas[i], index=i + 1, hold=False)
+                    self._draw_canvas(self.canvas[i], index=i, hold=False)
         else:
             # if index < 1 or index >= len(self.canvas.canvases):
             #     raise ValueError(f"Invalid axes index {index}")
