@@ -89,7 +89,7 @@ class Toolbar(widgets.VBox):
     def _on_home_clicked(self, button):
         """Reset all axes to home view"""
         for ax in self.figure.axes:
-            ax.autoscale_view()
+            ax.autoscale()
 
             # axes_id = id(axes)
             # if axes_id in self._home_views:
@@ -152,10 +152,10 @@ class Toolbar(widgets.VBox):
         #     # )
         # self._update_button_states()
 
-    def _store_home_view(self, axes):
-        """Store the current view of an axes as its home view"""
-        axes_id = id(axes)
-        self._home_views[axes_id] = (axes.get_xlim(), axes.get_ylim())
+    # def _store_home_view(self, axes):
+    #     """Store the current view of an axes as its home view"""
+    #     axes_id = id(axes)
+    #     self._home_views[axes_id] = (axes.get_xlim(), axes.get_ylim())
 
     def _setup_event_connections(self):
         # """Connect to all existing axes in the figure"""
@@ -320,6 +320,7 @@ class Toolbar(widgets.VBox):
         rect_y = min(y1, y2)
         rect_width = abs(x2 - x1)
         rect_height = abs(y2 - y1)
+        self._zoom_info["rectangle"] = (rect_x, rect_y, rect_width, rect_height)
 
         with hold_canvas(canvas):
             # Redraw figure content (same as figure.draw() internals)
@@ -341,7 +342,7 @@ class Toolbar(widgets.VBox):
             # canvas.global_alpha = 0.8
 
             # Draw rectangle border
-            canvas.stroke_rect(rect_x, rect_y, rect_width, rect_height)
+            canvas.stroke_rect(*self._zoom_info["rectangle"])
 
             # # Optional: fill with semi-transparent color
             # canvas.fill_style = "rgba(255, 0, 0, 0.1)"  # Light red
@@ -353,39 +354,48 @@ class Toolbar(widgets.VBox):
         """Complete zoom operation on the active axes"""
         # if self._zoom_rect_start is None or self._active_axes is None:
         #     return
-        self._zoom_info = None
+        # self._zoom_info = None
         self.figure.drawing_canvas.clear()
         # self.figure.draw()
-        return
-
-        # Clear the rectangle first
-        self._clear_zoom_rectangle()
-
-        x0, y0 = self._zoom_rect_start
-        x1, y1 = event.data_x, event.data_y
 
         # Ensure we have a proper rectangle (not just a click)
-        min_size = 0.01  # Minimum zoom region size
-        if abs(x1 - x0) < min_size or abs(y1 - y0) < min_size:
-            # self.status_label.value = "Zoom region too small"
-            self._zoom_rect_start = None
-            self._zoom_rect_start_canvas = None
+        min_size = 1  # Minimum zoom region size
+        if (
+            self._zoom_info["rectangle"][2] < min_size
+            or self._zoom_info["rectangle"][3] < min_size
+        ):
+            self._zoom_info = None
             self._active_axes = None
             return
 
-        # Set new limits on the active axes
-        new_xlim = (min(x0, x1), max(x0, x1))
-        new_ylim = (min(y0, y1), max(y0, y1))
+        index = self.figure._axes_to_canvas[id(self._active_axes)]
+        canvas = self.figure.canvas[index]
 
-        self._active_axes.set_xlim(*new_xlim)
-        self._active_axes.set_ylim(*new_ylim)
+        # Set new limits on the active axes
+        # ax = self._active_axes
+        # Convert rectangle corners back to data coordinates
+        x1 = min(self._zoom_info["origin"][0], x)
+        y1 = min(self._zoom_info["origin"][1], y)
+        x2, y2 = (
+            x1 + self._zoom_info["rectangle"][2],
+            y1 + self._zoom_info["rectangle"][3],
+        )
+        inv = self._active_axes.transData.inverted()
+        (xdata_1, ydata_1), (xdata_2, ydata_2) = inv.transform(
+            [(x1, flip_y(y1, canvas)), (x2, flip_y(y2, canvas))]
+        )
+
+        # new_xlim = (min(x0, x1), max(x0, x1))
+        # new_ylim = (min(y0, y1), max(y0, y1))
+
+        self._active_axes.set_xlim(xdata_1, xdata_2)
+        self._active_axes.set_ylim(ydata_1, ydata_2)
 
         # Clean up
-        self._zoom_rect_start = None
-        self._zoom_rect_start_canvas = None
-        self._active_axes = None
         # self.status_label.value = "Zoomed"
-        self.figure.draw()  # Final draw to ensure clean state
+        self.figure.draw(ax=self._active_axes)  # Final draw to ensure clean state
+        self._zoom_info = None
+        self._active_axes = None
 
     # # Also update the tool deactivation to clear any active rectangle
     # def _on_zoom_clicked(self, button):
