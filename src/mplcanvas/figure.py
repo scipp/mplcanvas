@@ -76,7 +76,7 @@ class Figure(ipw.HBox):
 
     def _draw_canvas(self, canvas, index, hold=True):
         """Render the entire figure"""
-        ctx = hold_canvas(canvas) if hold else nullcontext()
+        ctx = hold_canvas() if hold else nullcontext()
         with ctx:
             canvas.clear()
             ax = self._canvas_to_axes[index]
@@ -92,7 +92,8 @@ class Figure(ipw.HBox):
         index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
         if index is None:
             # Redraw all canvases
-            with hold_canvas(self.canvas):
+            # with hold_canvas(self.canvas):
+            with hold_canvas():
                 for i in range(len(self.canvas._canvases) - 1):
                     self._draw_canvas(self.canvas[i], index=i, hold=False)
         else:

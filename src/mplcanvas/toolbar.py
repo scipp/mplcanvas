@@ -223,7 +223,7 @@ class Toolbar(ipw.VBox):
         rect_height = abs(y2 - y1)
         self._zoom_info["rectangle"] = (rect_x, rect_y, rect_width, rect_height)
 
-        with hold_canvas(canvas):
+        with hold_canvas():
             canvas.clear()
 
             # Set rectangle style
