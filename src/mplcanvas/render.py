@@ -23,7 +23,9 @@ def draw_line(line, ax, canvas, limits):
 
 
 def draw_collection(collection, ax, canvas, limits):
-    # Currently, only support scatter collections
+    """
+    Currently, only support scatter collections
+    """
     offsets = collection.get_offsets()
     if len(offsets) == 0:
         return
@@ -45,7 +47,7 @@ def draw_collection(collection, ax, canvas, limits):
     canvas.fill_style = to_hex(collection.get_facecolor())
     canvas.stroke_style = to_hex(collection.get_edgecolor())
 
-    size = collection.get_sizes() ** 0.5
+    size = (collection.get_sizes() / np.pi) ** 0.5
     if len(size) == 1:
         size = size[0]
 
