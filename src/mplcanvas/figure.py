@@ -64,43 +64,23 @@ class Figure(ipw.HBox):
         """Find which axes (if any) contains the given canvas coordinates"""
         for ax in self.axes:
             if ax.contains_point(xy):
-                # # Convert to axes-relative coordinates
-                # axes_x = x - ax.x
-                # axes_y = y - ax.y
-                return ax  # , axes_x, axes_y
-        # return None, None, None
+                return ax
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         """
         Jupyter representation - this makes the figure display automatically
         when it's the result of a cell.
         """
-        # # Ensure we're drawn
-        # if self._auto_draw:
         self.draw()
-
-        # Let the parent VBox handle the representation
         return super()._repr_mimebundle_(include=include, exclude=exclude)
 
     def _draw_canvas(self, canvas, index, hold=True):
         """Render the entire figure"""
         ctx = hold_canvas(canvas) if hold else nullcontext()
         with ctx:
-            # Clear canvas
             canvas.clear()
-
-            # # Draw background
-            # canvas.fill_style = self.facecolor
-            # canvas.fill_rect(0, 0, self.width, self.height)
-
             ax = self._canvas_to_axes[index]
-            # print(f"Drawing axes {index} {ax}")
             draw_axes(ax, canvas)
-
-            # # Draw all axes
-            # # print("Drawing all axes...", self.mpl_figure.axes)
-            # for ax in self.mpl_figure.axes:
-            #     draw_axes(ax, canvas)
 
     def draw(self, ax: Axes | None = None):
         """
@@ -110,128 +90,10 @@ class Figure(ipw.HBox):
         If index is an integer, redraw only the specified axes (1-based index).
         """
         index = self._axes_to_canvas.get(id(ax)) if ax is not None else None
-        # print(f"Figure.draw called with ax={id(ax)} index={index}")
         if index is None:
             # Redraw all canvases
             with hold_canvas(self.canvas):
                 for i in range(len(self.canvas._canvases) - 1):
                     self._draw_canvas(self.canvas[i], index=i, hold=False)
         else:
-            # if index < 1 or index >= len(self.canvas.canvases):
-            #     raise ValueError(f"Invalid axes index {index}")
             self._draw_canvas(self.canvas[index], index=index)
-
-    def show(self):
-        """
-        Display the figure in Jupyter.
-
-        Note: This is mainly for backward compatibility.
-        The preferred way is to just have the figure as the last
-        line in a cell, which will use _repr_mimebundle_.
-        """
-        # Ensure we're drawn
-        if self._auto_draw:
-            self.draw()
-
-        # Return self so Jupyter displays it
-        return self
-
-    # def _repr_mimebundle_(self, include=None, exclude=None):
-    #     """
-    #     Jupyter representation - this makes the figure display automatically
-    #     when it's the result of a cell.
-    #     """
-    #     # Ensure we're drawn
-    #     if self._auto_draw:
-    #         self.draw()
-
-    #     # Let the parent VBox handle the representation
-    #     return super()._repr_mimebundle_(include=include, exclude=exclude)
-
-    def clf(self):
-        """Clear the figure"""
-        self.axes.clear()
-        self.draw()
-
-    # def add_child_widget(self, widget):
-    #     """
-    #     Add an additional widget to the figure (like a toolbar, slider, etc.)
-
-    #     This allows composing figures with other widgets easily.
-    #     """
-    #     self.children = list(self.children) + [widget]
-
-    # def insert_child_widget(self, index, widget):
-    #     """Insert a widget at a specific position"""
-    #     children = list(self.children)
-    #     children.insert(index, widget)
-    #     self.children = children
-
-    # Properties to make it more matplotlib-like
-    @property
-    def number(self):
-        """Figure number (for matplotlib compatibility)"""
-        return id(self)  # Use object id as figure number
-
-    def set_facecolor(self, color):
-        """Set the figure face color"""
-        self.facecolor = color
-        if self._auto_draw:
-            self.draw()
-
-    def set_size_inches(self, w, h=None, forward=True):
-        """
-        Set the figure size in inches.
-
-        If forward=True, also update the canvas size.
-        """
-        if h is None:
-            w, h = w  # Assume w is a tuple
-
-        self.figsize = (w, h)
-
-        if forward:
-            new_width = int(w * self.dpi)
-            new_height = int(h * self.dpi)
-
-            # Update canvas size
-            self.canvas.width = new_width
-            self.canvas.height = new_height
-            self.width = new_width
-            self.height = new_height
-
-            # Reposition axes
-            for ax in self.axes:
-                # Recalculate axes dimensions
-                margin_left = 80
-                margin_right = 20
-                margin_top = 20
-                margin_bottom = 60
-
-                ax.x = margin_left
-                ax.y = margin_top
-                ax.width = self.width - margin_left - margin_right
-                ax.height = self.height - margin_top - margin_bottom
-
-            if self._auto_draw:
-                self.draw()
-
-    # Toolbar management methods
-    def hide_toolbar(self):
-        """Hide the toolbar"""
-        if self.toolbar is not None:
-            self.children = [self.canvas]
-
-    def show_toolbar(self):
-        """Show the toolbar"""
-        if self.toolbar is not None:
-            self.children = [self.toolbar, self.canvas]
-        elif self._toolbar_enabled and self.axes:
-            self._create_toolbar(self.axes[0])
-
-    def toggle_toolbar(self):
-        """Toggle toolbar visibility"""
-        if self.toolbar is not None and self.toolbar in self.children:
-            self.hide_toolbar()
-        else:
-            self.show_toolbar()
