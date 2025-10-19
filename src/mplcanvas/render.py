@@ -58,6 +58,36 @@ def draw_collection(collection, ax, canvas, limits):
         canvas.fill_circles(x, y, size)
 
 
+def draw_image(image, ax, canvas):
+    cmap = image.get_cmap()
+    rgba = cmap(image.get_array())
+
+    img_height, img_width = rgba.shape[:2]
+
+    extent = image.get_extent()
+
+    # Convert data extent to display coordinates
+    (xmin, ymin), (xmax, ymax) = ax.transData.transform(
+        ((extent[0], extent[2]), (extent[1], extent[3]))
+    )
+    ymin = flip_y(ymin, canvas)
+    ymax = flip_y(ymax, canvas)
+
+    # Calculate display dimensions
+    display_width = xmax - xmin
+    display_height = ymax - ymin
+
+    # Draw scaled image
+    canvas.save()
+    canvas.translate(xmin, ymin)
+    canvas.scale(display_width / img_width, display_height / img_height)
+
+    # Flatten image data for put_image_data
+    image_1d = (rgba * 255).astype(np.uint8)
+    canvas.put_image_data(image_1d, 0, 0)  # , img_width, img_height)
+    canvas.restore()
+
+
 def draw_ticks_and_labels(ax, canvas):
     # Draw ticks and labels on all sides
     tick_length = 6
@@ -154,6 +184,10 @@ def draw_axes(ax, canvas):
     canvas.begin_path()
     canvas.rect(xmin_disp, ymin_disp, width, height)
     canvas.clip()
+
+    # Draw images
+    for image in ax.images:
+        draw_image(image, ax, canvas)
 
     # Draw all line artists
     for line in ax.lines:
