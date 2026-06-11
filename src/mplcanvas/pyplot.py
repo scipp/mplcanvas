@@ -18,19 +18,13 @@ import numpy as np
 
 from .figure import Figure
 
-# # Global state (like matplotlib.pyplot)
-# _current_figure: Optional[Figure] = None
-# _current_axes: Optional[Axes] = None
 
-
-# Figure management
 def figure(**kwargs) -> Figure:
     """
-    Create a new figure or retrieve an existing figure.
+    Create a new figure.
 
     Parameters match matplotlib.pyplot.figure()
     """
-
     return Figure(**kwargs)
 
 
@@ -40,20 +34,10 @@ def subplots(nrows=1, ncols=1, **kwargs):
 
     Returns (fig, ax) or (fig, axes_array) to match matplotlib exactly.
     """
-    # global _current_figure, _current_axes
     prod = nrows * ncols
     fig = figure(ncanvases=prod, **kwargs)
     axes = []
     for i in range(prod):
         ax = fig.add_subplot(nrows, ncols, i + 1)
         axes.append(ax)
-    # print("axes", axes)
     return fig, np.array(axes) if prod > 1 else axes[0]
-
-    # if nrows == 1 and ncols == 1:
-    #     ax = fig.mpl_figure.add_subplot(nrows, ncols, 1)
-    #     # _current_axes = ax
-    #     return fig, ax
-    # else:
-    #     # TODO: Implement multiple subplots
-    #     raise NotImplementedError("Multiple subplots not yet implemented")
