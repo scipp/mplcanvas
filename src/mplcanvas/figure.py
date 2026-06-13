@@ -34,6 +34,15 @@ class Figure(anywidget.AnyWidget):
     # Drawing commands sent to JavaScript
     draw_commands = traitlets.List([]).tag(sync=True)
 
+    # Tool state (synced with JavaScript)
+    active_tool = traitlets.Unicode("").tag(sync=True)  # "", "zoom", "pan"
+
+    # Axis limits update from JavaScript
+    axis_limits_update = traitlets.Dict({}).tag(sync=True)
+
+    # Trigger for home button
+    trigger_home = traitlets.Int(0).tag(sync=True)
+
     def __init__(self, ncanvases: int = 1, **kwargs):
         self.mpl_figure = MplFigure(**kwargs)
 
@@ -43,20 +52,35 @@ class Figure(anywidget.AnyWidget):
         width = int(self.figsize[0] * self.dpi)
         height = int(self.figsize[1] * self.dpi)
 
-        super().__init__(width=width, height=height, ncanvases=ncanvases + 1, **kwargs)
+        # Initialize the widget with explicit layout
+        super().__init__(
+            width=width,
+            height=height,
+            ncanvases=ncanvases + 1,
+            layout=ipw.Layout(
+                width=f"{width}px",
+                height=f"{height}px",
+            ),
+        )
 
         # Canvas to axes mapping
         self._axes_to_canvas = {}
         self._canvas_to_axes = {}
 
-        # Status bar and toolbar (future)
+        # Status bar
         self.status_bar = ipw.Label(value="")
         self.container = ipw.VBox([self, self.status_bar])
 
+        # Listen for axis limit updates from JavaScript
+        self.observe(self._on_axis_limits_update, names="axis_limits_update")
+        self.observe(self._on_home_triggered, names="trigger_home")
+
     def add_subplot(self, nrows: int, ncols: int, index: int, **kwargs) -> Axes:
         new_axes = self.mpl_figure.add_subplot(nrows, ncols, index, **kwargs)
-        self._axes_to_canvas[id(new_axes)] = index - 1
-        self._canvas_to_axes[index - 1] = new_axes
+        canvas_index = index - 1
+        self._axes_to_canvas[id(new_axes)] = canvas_index
+        self._canvas_to_axes[canvas_index] = new_axes
+
         return new_axes
 
     @property
@@ -87,6 +111,43 @@ class Figure(anywidget.AnyWidget):
         self.draw()
         return self.container._repr_mimebundle_(include=include, exclude=exclude)
 
+    def _on_axis_limits_update(self, change):
+        """Handle axis limit updates from JavaScript (after zoom/pan)"""
+        update = change["new"]
+        if not update:
+            return
+
+        canvas_index = update.get("canvas_index")
+        if canvas_index is None:
+            return
+
+        ax = self._canvas_to_axes.get(canvas_index)
+        if ax is None:
+            return
+
+        # Update matplotlib axes limits
+        xlim = update.get("xlim")
+        ylim = update.get("ylim")
+        if xlim:
+            ax.set_xlim(xlim)
+        if ylim:
+            ax.set_ylim(ylim)
+
+        # Redraw the axes
+        self.draw(ax=ax)
+
+    def _on_home_triggered(self, change):
+        """Handle home button clicks from JavaScript"""
+        self.home()
+
+    def home(self):
+        """Reset all axes to their home (original) limits using matplotlib's autoscaling"""
+        for ax in self._canvas_to_axes.values():
+            ax.autoscale(enable=True, axis='both')  # Re-enable autoscaling
+            ax.relim()  # Recalculate limits based on current data
+            ax.autoscale_view()  # Apply the recalculated limits
+        self.draw()
+
     def draw(self, ax: Axes | None = None):
         """
         Render the figure or a specific axes.
@@ -102,6 +163,7 @@ class Figure(anywidget.AnyWidget):
             for i in range(len(self._canvas_to_axes)):
                 ax = self._canvas_to_axes[i]
                 commands.append(self._generate_draw_commands(ax, i))
+
             self.draw_commands = commands
         else:
             # Redraw specific axes
@@ -128,24 +190,24 @@ class Figure(anywidget.AnyWidget):
         commands = {
             "canvas_index": canvas_index,
             "limits": {
-                "xmin": xmin,
-                "xmax": xmax,
-                "ymin": ymin,
-                "ymax": ymax,
-                "xmin_disp": xmin_disp,
-                "ymin_disp": ymin_disp,
-                "xmax_disp": xmax_disp,
-                "ymax_disp": ymax_disp,
-                "width": width,
-                "height": height,
+                "xmin": float(xmin),
+                "xmax": float(xmax),
+                "ymin": float(ymin),
+                "ymax": float(ymax),
+                "xmin_disp": float(xmin_disp),
+                "ymin_disp": float(ymin_disp),
+                "xmax_disp": float(xmax_disp),
+                "ymax_disp": float(ymax_disp),
+                "width": float(width),
+                "height": float(height),
             },
             "lines": [],
             "collections": [],
             "frame": {
-                "x": xmin_disp,
-                "y": ymin_disp,
-                "width": width,
-                "height": height,
+                "x": float(xmin_disp),
+                "y": float(ymin_disp),
+                "width": float(width),
+                "height": float(height),
                 "stroke_style": "black",
                 "line_width": 1.0,
             },
@@ -239,7 +301,7 @@ class Figure(anywidget.AnyWidget):
             if tick < xmin or tick > xmax:
                 continue
             x, y = ax.transData.transform((tick, ymin))
-            xticks_data.append({"x": x, "y": y, "label": label})
+            xticks_data.append({"x": float(x), "y": float(y), "label": label})
 
         yticks_data = []
         yticks = ax.get_yticks()
@@ -248,7 +310,7 @@ class Figure(anywidget.AnyWidget):
             if tick < ymin or tick > ymax:
                 continue
             x, y = ax.transData.transform((xmin, tick))
-            yticks_data.append({"x": x, "y": y, "label": label})
+            yticks_data.append({"x": float(x), "y": float(y), "label": label})
 
         xlabel = ax.xaxis.get_label()
         ylabel = ax.yaxis.get_label()
@@ -256,12 +318,16 @@ class Figure(anywidget.AnyWidget):
         xlabel_data = None
         if xlabel.get_text():
             x, y = ax.transAxes.transform(xlabel.get_position())
-            xlabel_data = {"x": x, "y": self.height, "text": xlabel.get_text()}
+            xlabel_data = {
+                "x": float(x),
+                "y": float(self.height),
+                "text": xlabel.get_text(),
+            }
 
         ylabel_data = None
         if ylabel.get_text():
             x, y = ax.transAxes.transform(ylabel.get_position())
-            ylabel_data = {"x": x, "y": y, "text": ylabel.get_text()}
+            ylabel_data = {"x": float(x), "y": float(y), "text": ylabel.get_text()}
 
         return {
             "tick_length": tick_length,
