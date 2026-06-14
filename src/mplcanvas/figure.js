@@ -65,6 +65,8 @@ function render({ model, el }) {
     panStartLimits: null,
     panDx: 0,
     panDy: 0,
+    panStartDx: 0,
+    panStartDy: 0,
     originalCommands: null,
   };
 
@@ -74,6 +76,11 @@ function render({ model, el }) {
     drawFromCommands(canvases, commands, height);
     // Store original commands for pan operations
     state.originalCommands = JSON.parse(JSON.stringify(commands));
+    // Reset pan offset since we now have updated data from Python
+    state.panDx = 0;
+    state.panDy = 0;
+    state.panStartDx = 0;
+    state.panStartDy = 0;
   });
 
   // Handle tool changes
@@ -187,18 +194,47 @@ function setupInteractions(container, overlayCanvas, canvases, state, model, can
     state.currentY = y;
 
     if (state.activeTool === "pan") {
+      // Always cache current commands and start fresh
+      state.originalCommands = JSON.parse(JSON.stringify(commands));
+
       state.panStartLimits = {
         xlim: [...state.activeAxes.limits.xlim],
         ylim: [...state.activeAxes.limits.ylim],
       };
+
+      // Always start from zero offset
       state.panDx = 0;
       state.panDy = 0;
+      state.panStartDx = 0;
+      state.panStartDy = 0;
+
       container.style.cursor = "grabbing";
     }
   });
 
   container.addEventListener("mousemove", (e) => {
     if (!state.isDrawing || !state.activeAxes) return;
+
+    // Safety check: ensure a mouse button is actually pressed
+    if (e.buttons === 0) {
+      // No button pressed, release the interaction
+      state.isDrawing = false;
+      state.activeAxes = null;
+      state.panStartLimits = null;
+      state.panStartDx = 0;
+      state.panStartDy = 0;
+      state.panDx = 0;
+      state.panDy = 0;
+
+      // Clear overlay
+      const ctx = overlayCanvas.getContext("2d");
+      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      if (state.activeTool === "pan") {
+        container.style.cursor = "move";
+      }
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -210,7 +246,7 @@ function setupInteractions(container, overlayCanvas, canvases, state, model, can
     if (state.activeTool === "zoom") {
       drawZoomRectangle(overlayCanvas, state, state.activeAxes.limits, canvasHeight);
     } else if (state.activeTool === "pan") {
-      // Calculate pan delta
+      // Calculate pan delta from start of this drag
       state.panDx = state.currentX - state.startX;
       state.panDy = state.currentY - state.startY;
 
@@ -229,71 +265,16 @@ function setupInteractions(container, overlayCanvas, canvases, state, model, can
     if (state.activeTool === "zoom") {
       completeZoom(state, model, canvasHeight);
     } else if (state.activeTool === "pan") {
-      // Store the canvas index before resetting state
-      const canvasIndex = state.activeAxes.canvas_index;
-
       // Finalize pan by updating matplotlib axes
       completePan(state, model, canvasHeight);
 
-      // Immediately redraw without offset to remove visual lag
-      if (state.originalCommands && state.originalCommands[canvasIndex]) {
-        const canvas = canvases[canvasIndex];
-        const ctx = canvas.getContext("2d");
-        const commands = state.originalCommands[canvasIndex];
-
-        // Clear and redraw at original position
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Set up clipping region
-        ctx.save();
-        ctx.beginPath();
-        const limits = commands.limits;
-        ctx.rect(limits.xmin_disp, limits.ymin_disp, limits.width, limits.height);
-        ctx.clip();
-
-        // Draw all lines
-        for (const line of commands.lines) {
-          drawLine(ctx, line, canvasHeight);
-        }
-
-        // Draw all collections
-        for (const collection of commands.collections) {
-          drawCollection(ctx, collection, canvasHeight);
-        }
-
-        ctx.restore();
-
-        // Draw frame and ticks
-        drawFrame(ctx, commands.frame, canvasHeight);
-        drawTicksAndLabels(ctx, commands.ticks, canvasHeight);
-      }
-
-      container.style.cursor = "move";
-    }
-
-    state.isDrawing = false;
-    state.activeAxes = null;
-    state.panStartLimits = null;
-    state.panDx = 0;
-    state.panDy = 0;
-
-    // Clear overlay
-    const ctx = overlayCanvas.getContext("2d");
-    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  });
-
-  container.addEventListener("mouseleave", () => {
-    if (state.isDrawing) {
-      // If panning, finalize
-      if (state.activeTool === "pan" && state.activeAxes) {
+      // Immediately redraw without offset to prevent jump on next pan
+      if (state.originalCommands) {
         const canvasIndex = state.activeAxes.canvas_index;
-        completePan(state, model, canvasHeight);
-
-        // Immediately redraw without offset
-        if (state.originalCommands && state.originalCommands[canvasIndex]) {
+        const commands = state.originalCommands[canvasIndex];
+        if (commands) {
           const canvas = canvases[canvasIndex];
           const ctx = canvas.getContext("2d");
-          const commands = state.originalCommands[canvasIndex];
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -318,9 +299,34 @@ function setupInteractions(container, overlayCanvas, canvases, state, model, can
         }
       }
 
+      container.style.cursor = "move";
+    }
+
+    state.isDrawing = false;
+    state.activeAxes = null;
+    state.panStartLimits = null;
+    state.panStartDx = 0;
+    state.panStartDy = 0;
+    state.panDx = 0;
+    state.panDy = 0;
+
+    // Clear overlay
+    const ctx = overlayCanvas.getContext("2d");
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  });
+
+  container.addEventListener("mouseleave", () => {
+    if (state.isDrawing) {
+      // If panning, finalize
+      if (state.activeTool === "pan" && state.activeAxes) {
+        completePan(state, model, canvasHeight);
+      }
+
       state.isDrawing = false;
       state.activeAxes = null;
       state.panStartLimits = null;
+      state.panStartDx = 0;
+      state.panStartDy = 0;
       state.panDx = 0;
       state.panDy = 0;
 
